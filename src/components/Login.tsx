@@ -5,7 +5,11 @@
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { User, Dumbbell, ArrowRight } from 'lucide-react';
+import { User as UserIcon, Dumbbell, ArrowRight } from 'lucide-react';
+import { signInAnonymously } from 'firebase/auth';
+import { auth } from '../lib/firebase';
+import { saveUser } from '../lib/storage';
+import { User } from '../types';
 
 interface LoginProps {
   onLogin: (name: string) => void;
@@ -13,11 +17,29 @@ interface LoginProps {
 
 export function Login({ onLogin }: LoginProps) {
   const [name, setName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onLogin(name.trim());
+    if (name.trim() && !isLoading) {
+      setIsLoading(true);
+      try {
+        const userCredential = await signInAnonymously(auth);
+        const newUser: User = {
+          name: name.trim(),
+          currentWeight: 0,
+          targetWeight: 0,
+          dailyCaloriesGoal: 2000,
+          dailyWaterGoal: 2000,
+          status: 'active'
+        };
+        await saveUser(userCredential.user.uid, newUser);
+        onLogin(name.trim());
+      } catch (error) {
+        console.error('Login failed:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -85,7 +107,7 @@ export function Login({ onLogin }: LoginProps) {
               </label>
               <div className="relative group">
                 <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-green-500 transition-colors">
-                  <User className="w-5 h-5" />
+                  <UserIcon className="w-5 h-5" />
                 </div>
                 <input
                   id="name"

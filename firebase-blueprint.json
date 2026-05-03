@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and goals",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "currentWeight": { "type": "number" },
+        "targetWeight": { "type": "number" },
+        "dailyCaloriesGoal": { "type": "number" },
+        "dailyWaterGoal": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status"]
+    },
+    "WorkoutPlan": {
+      "title": "Workout Plan",
+      "description": "A scheduled workout plan with exercises",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "time": { "type": "string" },
+        "dayOfWeek": { "type": "string" },
+        "exercises": {
+          "type": "array",
+          "items": {
+             "type": "object",
+             "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "sets": { "type": "number" },
+                "reps": { "type": "string" },
+                "duration": { "type": "number" },
+                "description": { "type": "string" }
+             }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "WeightEntry": {
+      "title": "Weight Entry",
+      "description": "Historical weight record",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date-time" },
+        "weight": { "type": "number" }
+      }
+    },
+    "DailyStats": {
+      "title": "Daily Stats",
+      "description": "Daily nutrition and activity tracking",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "calories": { "type": "number" },
+        "water": { "type": "number" },
+        "workouts": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User document containing profile and settings"
+    },
+    "/users/{userId}/plans/{planId}": {
+      "schema": "WorkoutPlan",
+      "description": "User's individual workout plans"
+    },
+    "/users/{userId}/weightHistory/{entryId}": {
+      "schema": "WeightEntry",
+      "description": "Weight tracking entries"
+    },
+    "/users/{userId}/dailyLogs/{date}": {
+      "schema": "DailyStats",
+      "description": "Stats for a specific day"
+    }
+  }
+}

@@ -19,13 +19,16 @@ export const Sport: React.FC<{
   const [activeExercises, setActiveExercises] = useState<Exercise[] | null>(null);
   const [currentWeek, setCurrentWeek] = useState(1);
 
-  const stats = Object.values(logs).reduce((acc, log) => {
-    if (log.workouts && log.workouts.length > 0) {
-      acc.days += 1;
-      acc.exercises += log.workouts.length;
+  let daysCount = 0;
+  let exercisesCount = 0;
+  Object.values(logs).forEach((log: any) => {
+    const dailyWorkouts = log.workouts || [];
+    if (dailyWorkouts.length > 0) {
+      daysCount += 1;
+      exercisesCount += dailyWorkouts.length;
     }
-    return acc;
-  }, { days: 0, exercises: 0 });
+  });
+  const stats = { days: daysCount, exercises: exercisesCount };
 
   // Current week is calculated based on how many full cycles (7 days) have been done
   // or at least showing which week the user is on based on progress

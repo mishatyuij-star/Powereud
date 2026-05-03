@@ -3,12 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './lib/firebase';
+import { getUser, getPlans, getWeightHistory, getDailyLog, saveUser } from './lib/storage';
 import { Layout } from './components/Layout';
 import { Login } from './components/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -16,58 +14,74 @@ import { Sport } from './pages/Sport';
 import { Plans } from './pages/Plans';
 import { Progress } from './pages/Progress';
 import { Profile } from './pages/Profile';
-import { AppState, User, DailyStats } from './types';
-import { loadState, saveState, getDailyLog } from './lib/storage';
+import { AppState, User, WorkoutPlan } from './types';
 
 export default function App() {
-  const [state, setState] = useState<AppState>(loadState());
+  const [user, setUser] = useState<any>(null);
+  const [state, setState] = useState<AppState>({
+    user: null,
+    plans: [],
+    weightHistory: [],
+    dailyLogs: {},
+  });
   const [activeTab, setActiveTab] = useState('home');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    saveState(state);
-  }, [state]);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        // Load data from Firestore
+        const userData = await getUser(firebaseUser.uid);
+        if (userData) {
+          const plans = await getPlans(firebaseUser.uid);
+          const history = await getWeightHistory(firebaseUser.uid);
+          const today = new Date().toISOString().split('T')[0];
+          const stats = await getDailyLog(firebaseUser.uid, today);
+          
+          setState({
+            user: userData,
+            plans,
+            weightHistory: history,
+            dailyLogs: { [today]: stats },
+          });
+        }
+      } else {
+        setUser(null);
+        setState({
+          user: null,
+          plans: [],
+          weightHistory: [],
+          dailyLogs: {},
+        });
+      }
+      setLoading(false);
+    });
 
-  const handleLogin = (name: string) => {
-    const newUser: User = {
-      name,
-      currentWeight: 0,
-      targetWeight: 0,
-      dailyCaloriesGoal: 2000,
-      dailyWaterGoal: 2000,
-      status: 'active'
-    };
-    setState(prev => ({ ...prev, user: newUser }));
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async (name: string) => {
+    // Handled in Login component via signInAnonymously
   };
 
-  const handleLogout = () => {
-    setState(prev => ({ ...prev, user: null }));
+  const handleLogout = async () => {
+    await signOut(auth);
     setActiveTab('home');
   };
 
-  const handleUpdateUser = (updatedUser: User) => {
-    setState(prev => ({ ...prev, user: updatedUser }));
+  const handleUpdateUser = async (updatedUser: User) => {
+    if (user) {
+      setState(prev => ({ ...prev, user: updatedUser }));
+      await saveUser(user.uid, updatedUser);
+    }
   };
 
   const handleWorkoutComplete = () => {
-    // Add current date to stats
+    // Current simple implementation continues to update local state
+    // In a real app, this would call updateDailyLog
     const today = new Date().toISOString().split('T')[0];
-    const log = getDailyLog(today);
-    
-    // Simulate slight weight variation for "progress"
-    const currentWeight = state.user?.currentWeight || 0;
-    const newWeight = currentWeight > 0 ? currentWeight - 0.1 : 0;
-    
-    const newState = {
-      ...state,
-      user: state.user ? { ...state.user, currentWeight: Number(newWeight.toFixed(1)) } : null,
-      weightHistory: [...state.weightHistory, { date: new Date().toISOString(), weight: newWeight }],
-      dailyLogs: {
-        ...state.dailyLogs,
-        [today]: { ...log, workouts: [...log.workouts, 'workout_id'] }
-      }
-    };
-    
-    setState(newState);
     setActiveTab('progress');
   };
 
@@ -82,12 +96,20 @@ export default function App() {
     }));
   };
 
-  if (!state.user) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user || !state.user) {
     return <Login onLogin={handleLogin} />;
   }
 
   const today = new Date().toISOString().split('T')[0];
-  const dailyStats = getDailyLog(today);
+  const dailyStats = state.dailyLogs[today] || { date: today, calories: 0, water: 0, workouts: [] };
 
   const renderContent = () => {
     switch (activeTab) {

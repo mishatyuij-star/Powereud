@@ -1,0 +1,93 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() <= 100 &&
+             data.currentWeight is number &&
+             data.targetWeight is number &&
+             data.dailyCaloriesGoal is number &&
+             data.dailyWaterGoal is number &&
+             data.status in ['active', 'inactive'];
+    }
+
+    function isValidWorkoutPlan(data) {
+      return data.name is string && data.name.size() <= 100 &&
+             data.time is string &&
+             data.dayOfWeek is string &&
+             data.exercises is list &&
+             data.exercises.size() <= 50; // Bound lists
+    }
+
+    function isValidWeightEntry(data) {
+      return data.date is string &&
+             data.weight is number;
+    }
+
+    function isValidDailyStats(data) {
+      return data.date is string &&
+             data.calories is number &&
+             data.water is number &&
+             data.workouts is list &&
+             data.workouts.size() <= 20;
+    }
+
+    // --- Collection Matches ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming());
+
+      match /plans/{planId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidWorkoutPlan(incoming());
+        allow update: if isOwner(userId) && isValidWorkoutPlan(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      match /weightHistory/{entryId} {
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidWeightEntry(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      match /dailyLogs/{dateId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidDailyStats(incoming());
+      }
+    }
+  }
+}
